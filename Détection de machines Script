@@ -1,0 +1,119 @@
+import os
+import subprocess
+import threading
+import tkinter as tk
+from tkinter import messagebox, ttk
+import time
+
+def list_machines():
+    threading.Thread(target=_list_machines).start()
+
+def _list_machines():
+    start_progress_continuous()
+    ip_range = ip_entry.get()
+    try:
+        process = subprocess.Popen(["nmap", "-sP", ip_range], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        while process.poll() is None:
+            time.sleep(0.1)
+            root.after(0, update_progress)
+        stdout, stderr = process.communicate()
+        if process.returncode != 0:
+            raise Exception(stderr)
+        text_area.delete('1.0', tk.END)
+        text_area.insert(tk.END, stdout)
+        generate_html_report(stdout)
+        messagebox.showinfo("Succès", "Le scan des machines disponibles est terminé.")
+    except Exception as e:
+        messagebox.showerror("Erreur", f"Erreur lors du scan des machines : {e}")
+    finally:
+        stop_progress()
+
+def generate_html_report(scan_output):
+    lines = scan_output.split('\n')
+    html_content = "<html><head><title>Rapport de détection de machines</title></head><body>"
+    html_content += "<h1>Rapport de détection de machines</h1>"
+    html_content += "<table border='1'><tr><th style='color:red'>Adresse IP</th><th style='color:red'>Nom d'hôte</th><th style='color:red'>Adresse MAC</th></tr>"
+    
+    ip_count = 0
+    for line in lines:
+        if "Nmap scan report for" in line:
+            parts = line.split(" ")
+            ip_address = parts[-1]
+            hostname = parts[4] if parts[4] != 'for' else 'N/A'
+            mac_address = 'N/A'
+            html_content += f"<tr><td>{ip_address}</td><td>{hostname}</td><td>{mac_address}</td></tr>"
+            ip_count += 1
+        if "MAC Address:" in line:
+            mac_address = line.split("MAC Address: ")[1].split(" ")[0]
+            html_content = html_content.replace('<td>N/A</td></tr>', f'<td>{mac_address}</td></tr>', 1)
+    
+    html_content += "</table>"
+    html_content += f"<p>Nombre total d'adresses IP trouvées : {ip_count}</p>"
+    html_content += "</body></html>"
+
+    with open("detection_report.html", "w") as report_file:
+        report_file.write(html_content)
+
+def get_nmap_version():
+    result = subprocess.run(["nmap", "--version"], capture_output=True, text=True)
+    version_info = result.stdout.split('\n')[0]
+    return version_info
+
+def start_progress():
+    progress_bar['value'] = 0
+    progress_label['text'] = "Progress: 0%"
+
+def stop_progress():
+    progress_bar['value'] = 100
+    progress_label['text'] = "Progress: 100%"
+
+def start_progress_continuous():
+    progress_bar['value'] = 0
+    progress_label['text'] = "Progress: 0%"
+    root.after(100, update_progress)
+
+def update_progress():
+    current_value = progress_bar['value']
+    if current_value < 100:
+        new_value = current_value + 1
+        if new_value > 100:
+            new_value = 100
+        progress_bar['value'] = new_value
+        progress_label['text'] = f"Progress: {new_value}%"
+        root.after(100, update_progress)
+
+# Interface utilisateur Tkinter
+root = tk.Tk()
+root.title("Nmap GUI")
+root.configure(bg='navy')
+
+# Version info
+version_info = get_nmap_version()
+tk.Label(root, text=version_info, font=("Helvetica", 10, "italic"), bg='navy', fg='white').grid(row=0, column=0, columnspan=2, pady=5)
+
+# IP address entry
+tk.Label(root, text="Adresse IP :", font=("Helvetica", 12), bg='navy', fg='white').grid(row=1, column=0, sticky="e", padx=5, pady=5)
+ip_entry = tk.Entry(root)
+ip_entry.grid(row=1, column=1, padx=5, pady=5)
+
+# Buttons
+button_frame = tk.Frame(root, bg='navy')
+button_frame.grid(row=2, column=0, columnspan=2, pady=10)
+
+button_style = {"width": 20, "font": ("Helvetica", 10), "bg": "dodgerblue", "fg": "white"}
+
+tk.Button(button_frame, text="Détection de machines", command=list_machines, **button_style).grid(row=0, column=0, padx=5)
+
+# Text area
+text_area = tk.Text(root, wrap=tk.WORD, width=60, height=15)
+text_area.grid(row=3, column=0, columnspan=2, padx=10, pady=10)
+
+# Progress bar
+progress_bar = ttk.Progressbar(root, mode='determinate', maximum=100)
+progress_bar.grid(row=4, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+
+# Progress label
+progress_label = tk.Label(root, text="Progress: 0%", font=("Helvetica", 12), bg='navy', fg='white')
+progress_label.grid(row=5, column=0, columnspan=2, pady=5)
+
+root.mainloop()
