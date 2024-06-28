@@ -25,6 +25,7 @@ Pour exécuter ce projet, vous devez installer les bibliothèques Python suivant
 
 
 Installation des dépendances
+
 Vous pouvez installer toutes les dépendances en utilisant les commandes pip suivantes :
 
 pip install pynput
@@ -38,9 +39,11 @@ pip install beautifulsoup4
 
 
 Installation de Nmap
+
 En plus des bibliothèques Python, vous devez également installer Nmap sur votre système. Vous pouvez télécharger et installer Nmap à partir du site officiel de Nmap.
 
 Utilisation
+
 Pour utiliser la toolbox, il suffit de lancer le script ystoolbox.py :
 python ystoolbox.py
 
