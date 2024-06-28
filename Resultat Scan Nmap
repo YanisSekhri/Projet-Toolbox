@@ -18,13 +18,13 @@
                 <tr>
                     <th>Port</th>
                     <th>Protocole</th>
-                    <th>État</th>
+                    <th>Ã‰tat</th>
                     <th>Service</th>
-                    <th>Informations supplémentaires</th>
+                    <th>Informations supplÃ©mentaires</th>
                 </tr>
         <tr><td>21</td><td>tcp</td><td>open</td><td>ftp</td><td>vsftpd 2.3.4</td></tr><tr><td>22</td><td>tcp</td><td>open</td><td>ssh</td><td>OpenSSH 4.7p1 Debian 8ubuntu1 (protocol 2.0)</td></tr><tr><td>23</td><td>tcp</td><td>open</td><td>telnet</td><td>Linux telnetd</td></tr><tr><td>25</td><td>tcp</td><td>open</td><td>smtp</td><td>Postfix smtpd</td></tr><tr><td>53</td><td>tcp</td><td>open</td><td>domain</td><td>ISC BIND 9.4.2</td></tr><tr><td>80</td><td>tcp</td><td>open</td><td>http</td><td>Apache httpd 2.2.8 ((Ubuntu) DAV/2)</td></tr><tr><td>111</td><td>tcp</td><td>open</td><td>rpcbind</td><td>2 (RPC #100000)</td></tr><tr><td>139</td><td>tcp</td><td>open</td><td>netbios-ssn</td><td>Samba smbd 3.X - 4.X (workgroup: WORKGROUP)</td></tr><tr><td>445</td><td>tcp</td><td>open</td><td>netbios-ssn</td><td>Samba smbd 3.X - 4.X (workgroup: WORKGROUP)</td></tr><tr><td>512</td><td>tcp</td><td>open</td><td>exec</td><td>netkit-rsh rexecd</td></tr><tr><td>513</td><td>tcp</td><td>open</td><td>login</td><td>?</td></tr><tr><td>514</td><td>tcp</td><td>open</td><td>tcpwrapped</td><td></td></tr><tr><td>1099</td><td>tcp</td><td>open</td><td>java-rmi</td><td>GNU Classpath grmiregistry</td></tr>
             </table>
-            <p>Scan réalisé le: 2024-06-20 13:46:24</p>
+            <p>Scan rÃ©alisÃ© le: 2024-06-20 13:46:24</p>
         </body>
         </html>
         
