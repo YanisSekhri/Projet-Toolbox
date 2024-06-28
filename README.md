@@ -30,14 +30,14 @@ Installation des dépendances
 
 Vous pouvez installer toutes les dépendances en utilisant les commandes pip suivantes :
 
-pip install pynput
-pip install requests
-pip install paramiko
-pip install scapy
-pip install pillow
-pip install nmap
-pip install pandas
-pip install beautifulsoup4
+- pip install pynput
+- pip install requests
+- pip install paramiko
+- pip install scapy
+- pip install pillow
+- pip install nmap
+- pip install pandas
+- pip install beautifulsoup4
 
 
 
