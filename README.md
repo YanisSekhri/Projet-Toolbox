@@ -51,22 +51,23 @@ Cela ouvrira une interface graphique permettant d'accéder à toutes les fonctio
 
 
 Détails des fonctionnalités
-Scanner Nmap
+
+Scanner Nmap : 
 Scanne les ports d'une adresse IP ou d'un réseau. Vous pouvez configurer les options de scan comme le scan furtif (SYN), la détection de version, la détection du système d'exploitation et le scan agressif. Les résultats peuvent être exportés en format HTML.
 
-Scanner de vulnérabilités
+Scanner de vulnérabilités: 
 Scanne une adresse IP ou un nom DNS pour identifier les vulnérabilités en utilisant Nmap et le script vulners. Les résultats sont affichés dans l'interface et peuvent être exportés en format HTML avec des recommandations.
 
 Keylogger
 Enregistre les frappes de touches et les sauvegarde dans un fichier listkey.txt. Vous pouvez démarrer, arrêter et ouvrir le fichier de log à partir de l'interface graphique.
 
-Attaque par force brute SSH
+Attaque par force brute SSH : 
 Utilise paramiko pour tenter de se connecter à un serveur SSH en utilisant une liste de noms d'utilisateur et de mots de passe. Les résultats de l'attaque sont affichés dans l'interface et un fichier de log est généré.
 
-Détection de machines
+Détection de machines : 
 Scanne une plage d'adresses IP pour identifier les périphériques connectés au réseau. Les résultats sont affichés dans l'interface et peuvent être exportés en format HTML.
 
-Auteurs
+Auteurs : 
 Ce projet a été développé par Yanis Sekhri.
 
 Ce README fournit une description complète du projet, des fonctionnalités disponibles, des étapes d'installation et des détails d'utilisation pour chaque outil inclus.
